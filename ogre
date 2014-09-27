@@ -7,7 +7,7 @@ import tempfile
 import gzip
 import sys
 
-VERSION = 0.01
+VERSION = 0.02
 TEMP_DIR = tempfile.gettempdir()
 
 
@@ -27,9 +27,9 @@ def send_packet(host, port, timeout_seconds, recv_bytes):
         #_s = socket.socket().connect((ip, port))
         _s.connect((host, port))
         _s.sendall(b" ")  # send something to try to prompt a response
-        return host, port, _s.recv(recv_bytes)
+        return 1, host, port, _s.recv(recv_bytes)
     except Exception as e:
-        return host, port, e
+        return 0, host, port, e
 
 
 def iterate_over_password_file(password_file):
@@ -63,19 +63,20 @@ def ssh(host, port, username, password=None, timeout=5):
                     #_s.readlines() for ChannelFile
                     _s = list(_s)
                     if len(_s) > 0:
-                        return host, port, _s
+                        return 1, host, port, _s
                 client.close()
             except socket.error as e:
-                return host, port, "socket was closed on us"
+                return 0, host, port, "socket was closed on us"
         except socket.error as e:
-            return host, port, "[socket.error] {host} : {error}".format(host=host, error=e)
+            return 0, host, port, "[socket.error] {host} : {error}".format(host=host, error=e)
         except paramiko.SSHException as pm_ssh:
-            return host, port, "[paramiko.SSHException] : {0}".format(pm_ssh)
+            return 0, host, port, "[paramiko.SSHException] : {0}".format(pm_ssh)
         except Exception as e:
-            return host, port, e
+            return 0, host, port, e
 
-    except:  # don"t crash out, we might be in a loop to check N hosts
-        return 0, "{0} : fatal error".format(host)
+    except:  # don't crash out, we might be in a loop to check N hosts
+        return 0, host, port, "[exception] fatal error occurred before creating connection"
+
 
 def scan(settings_dict):
     if settings_dict["debug"]:
@@ -170,7 +171,7 @@ if __name__ == "__main__":
         elif "," in args.ports[0]:
             args.ports = args.ports[0].split(",")
 
-    # evaluate this only when we"re done modifying args.
+    # evaluate this only when we"'re done modifying args.
     argument_dictionary = vars(args)
 
     if args.scan and args.crack:
