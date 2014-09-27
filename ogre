@@ -82,9 +82,17 @@ def scan(settings_dict):
     if settings_dict["debug"]:
         print("DEBUG >> " + str(settings_dict))
 
+    # TODO: profile moving `settings_dict['open_only'] == False` before loop so we don't have to do O(n)
+    #       comparisons.  it's cleaner/DRY-er to do an inline check, so see if check gets optimized already
+
     for _port in settings_dict["ports"]:
-        print(send_packet(settings_dict["host"], int(_port),
-                          settings_dict["timeout"], settings_dict["scan_receive_bytes"]))
+        _resp = send_packet(settings_dict["host"], int(_port),
+                            settings_dict["timeout"], settings_dict["scan_receive_bytes"])
+
+        if settings_dict["show_failures"]:
+            print(_resp)
+        elif _resp[0] == 1:  # print only success
+            print(_resp)
 
 
 def crack(settings_dict):
@@ -141,8 +149,8 @@ if __name__ == "__main__":
                         type=str, default=TEMP_DIR+"/ogre.txt",
                         help="path to logfile to use.  defaults to $TMPDIR/ogre.txt")
     parser.add_argument("--debug", "-d", action="store_true", default=False, help="get debugging information")
-    parser.add_argument("--open-only", "--open", action="store_true", default=True,
-                        help="only display open ports in the output")
+    parser.add_argument("--show_failures", "--failures", action="store_true", default=False,
+                        help="display closed/refused connections to ports in the output")
 
     # TODO: username file? for u in username_file (fork): for p in password (fork)
     options_ssh = parser.add_argument_group("ssh", "options for trying to get a shell via ssh")
