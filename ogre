@@ -11,7 +11,7 @@ VERSION = 0.01
 TEMP_DIR = tempfile.gettempdir()
 
 
-def send_packet(ip, port, timeout_seconds, recv_bytes):
+def send_packet(host, port, timeout_seconds, recv_bytes):
     """
     [Errno 61] Connection refused => probably nothing listening
 
@@ -25,11 +25,11 @@ def send_packet(ip, port, timeout_seconds, recv_bytes):
         socket.setdefaulttimeout(timeout_seconds)
         _s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #_s = socket.socket().connect((ip, port))
-        _s.connect((ip, port))
+        _s.connect((host, port))
         _s.sendall(b' ')  # send something to try to prompt a response
-        return 1, _s.recv(recv_bytes)
+        return host, port, _s.recv(recv_bytes)
     except Exception as e:
-        return 0, e
+        return host, port, e
 
 
 def iterate_over_password_file(password_file):
@@ -63,16 +63,16 @@ def ssh(host, port, username, password=None, timeout=5):
                     #_s.readlines() for ChannelFile
                     _s = list(_s)
                     if len(_s) > 0:
-                        return 1, _s
+                        return host, port, _s
                 client.close()
             except socket.error as e:
-                return 0, "socket was closed on us"
+                return host, port, "socket was closed on us"
         except socket.error as e:
-            return 0, "[socket.error] {host} : {error}".format(host=host, error=e)
+            return host, port, "[socket.error] {host} : {error}".format(host=host, error=e)
         except paramiko.SSHException as pm_ssh:
-            return 0, "[paramiko.SSHException] : {0}".format(pm_ssh)
+            return host, port, "[paramiko.SSHException] : {0}".format(pm_ssh)
         except Exception as e:
-            return 0, e
+            return host, port, e
 
     except:  # don't crash out, we might be in a loop to check N hosts
         return 0, "{0} : fatal error".format(host)
@@ -136,8 +136,9 @@ if __name__ == '__main__':
                         type=str, default=TEMP_DIR+'/ogre.txt',
                         help='path to logfile to use.  defaults to $TMPDIR/ogre.txt')
     parser.add_argument('--debug', '-d', action='store_true', default=False, help='get debugging information')
+    # TODO: ONLY PRINT SUCCESSES
 
-    # TODO: username file?
+    # TODO: username file? for u in username_file (fork): for p in password (fork)
     options_ssh = parser.add_argument_group('ssh', 'options for trying to get a shell via ssh')
     options_ssh.add_argument('--username', '-u', type=str, help='specify username (defaults to root)')
 
