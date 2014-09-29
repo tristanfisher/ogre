@@ -41,10 +41,9 @@ def send_packet(host, port, timeout_seconds, recv_bytes):
     If this is a problem, open a pull req with better handling per protocol.
     """
     try:
-        socket.setdefaulttimeout(timeout_seconds)
         _s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         _s.setblocking(1)
-        #_s = socket.socket().connect((ip, port))
+        _s.settimeout(timeout_seconds)
         _s.connect((host, port))
         _s.sendall(b" ")  # send something to try to prompt a response
         return 1, host, port, _s.recv(recv_bytes)
