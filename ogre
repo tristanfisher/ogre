@@ -137,8 +137,6 @@ def crack(settings_dict):
             for _pass in iterate_over_password_file(settings_dict["password_file"]):
 
                 _pass = _pass.rstrip() #remove whatever separates lines
-
-                print(_pass)
                 print(ssh(host=settings_dict["host"], port=int(_port),
                     username=settings_dict["username"], password=_pass, timeout=settings_dict["timeout"]))
 
@@ -182,8 +180,8 @@ if __name__ == "__main__":
                              type=str, help="if you know the password, specify it, else, use --password_file")
     options_ssh.add_argument("--password_file", "-f", metavar="PASSWORD_FILE_NAME",
                              type=str, help="specify a password file, newline separated")
-    options_ssh.add_argument("--stop_on_success", action="store_true", default=True,
-                        help="stop trying to get a shell when successful")
+    options_ssh.add_argument("--stop_on_success", action="store_false", default=True,
+                        help="stop trying to get a shell when successful (useful when trying multiple usernames")
 
     args = parser.parse_args()
 
