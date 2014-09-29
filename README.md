@@ -5,6 +5,44 @@ throw connections at a host to try to figure out if services are listening.
 
 optionally brute force your way in.
 
+####how to use
+
+Type `./ogre --help` to get usage information:
+	
+	usage: ogre [-h] [--scan] [--crack] [--version] [--verbose] --host HOST
+	            [--ports [PORTS [PORTS ...]]]
+	            [--scan_receive_bytes SCAN_RECEIVE_BYTES]
+	            [--timeout TIMEOUT SECONDS] [--log_file /PATH/TO/LOGFILE]
+	            [--debug] [--show_failures] [--username USERNAME]
+	            [--password PASSWORD] [--password_file PASSWORD_FILE_NAME]
+	            [--stop_on_success]
+
+Or if you prefer, check out the following:
+
+#####--scan
+
+Specify a `--host` and a comma separated set of ports:
+
+	./ogre --host tristanfisher.com --scan -p 22,80,443
+
+Or a range of ports:
+
+	./ogre --host tristanfisher.com --scan -p 22-1024
+	
+Or just one port:
+
+	./ogre --host tristanfisher.com --scan -p 22
+
+#####--crack
+
+Specify a password dictionary (*ogre* can read gzip or plaintext files, no need to decompress first):
+
+	./ogre --ip 127.0.0.1 --port 22 --username 'tristan' --crack --password_file password_dictionary.txt.gz --timeout 1
+
+
+Or, if you know the password, specify it:
+
+	./ogre --ip 127.0.0.1 --port 22 --username 'tristan' --crack --password 'password'
 
 ####why?
 
