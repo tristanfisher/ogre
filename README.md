@@ -17,7 +17,7 @@ to complicate the matter, i think i set up iptables well enough that it's filter
 
 ###### malicious use 
 
-depending on where you live, it's probably illegal to use this tool to break your way into a server you don't own.  regardless of where you live, it's probably immoral. 
+depending on where you live, it's probably illegal to use this tool to break your way into a server you don't own.  regardless of where you live, it's probably immoral.  i disclaim any liability for your actions.
 
 ###### password_dictionary.txt
 
@@ -31,4 +31,4 @@ for what it's worth, the first file that was redirected was 10k passwords in ord
 
 please don't open pull requests or issues about the example dictionary, as it's a sample file that is already abrasively large for git.
 
-if you do know of any publically-available, open-source lists, i am willing to add links to the readme. 
+if you do know of any publically-available, open-source lists, i am willing to add links to the readme.
