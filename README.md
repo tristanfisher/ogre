@@ -32,3 +32,29 @@ for what it's worth, the first file that was redirected was 10k passwords in ord
 please don't open pull requests or issues about the example dictionary, as it's a sample file that is already abrasively large for git.
 
 if you do know of any publically-available, open-source lists, i am willing to add links to the readme.
+
+###### securing against dictionary attacks
+
+while by no means an exhaustive list, the following will help:
+
+for all traffic: 
+
+- consider tracking and limiting malicious users from making connections (e.g. fail2ban, session database)
+
+- lock accounts and notify users if N-login attempts have failed
+
+- set your firewall to only allow administrative traffic from some networks (if you always ssh from 74.1.x.x/16...)
+
+
+for ssh (configured via sshd_config): 
+
+- if you can, disallow password-based SSH access that does not also require a key-exchange (`PasswordAuthentication no`)
+ 
+- don't allow root to log in over ssh (username is predictable -- not as big of a deal if you can disallow password-only auth `PermitRootLogin no`)
+
+- keep in mind that not all accounts on the system need SSH access (`AllowUsers xUser yUser zUser`)
+
+ 
+###### license
+
+this software is licensed under the [gnu affero gpl v3](LICENSE)
