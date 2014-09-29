@@ -99,9 +99,11 @@ def ssh(host, port, username, password=None, timeout=5):
         return 0, host, port, "[exception] fatal error occurred before creating connection"
 
 
-def output_response(_resp):
-    print(_resp)
-
+def output_response(_resp, show_failures=False):
+        if show_failures:
+            print(_resp)
+        elif _resp[0] == 1:
+            print(_resp)
 
 
 def scan(settings_dict):
@@ -112,13 +114,8 @@ def scan(settings_dict):
     #       comparisons.  it's cleaner/DRY-er to do an inline check, so see if check gets optimized already
 
     for _port in settings_dict["ports"]:
-        _resp = send_packet(settings_dict["host"], int(_port),
-                            settings_dict["timeout"], settings_dict["scan_receive_bytes"])
-
-        if settings_dict["show_failures"]:
-            print(_resp)
-        elif _resp[0] == 1:  # print only success
-            print(_resp)
+        output_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
+                                    settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
 
 
 def crack(settings_dict):
@@ -133,9 +130,9 @@ def crack(settings_dict):
 
     if settings_dict["password"]:
         for _port in settings_dict["ports"]:
-            print(ssh(host=settings_dict["host"], port=int(_port),
+            output_response(ssh(host=settings_dict["host"], port=int(_port),
                 username=_username, password=settings_dict["password"],
-                timeout=settings_dict["timeout"]))
+                timeout=settings_dict["timeout"]), settings_dict["show_failures"])
 
     else:
         for _port in settings_dict["ports"]:
@@ -145,7 +142,7 @@ def crack(settings_dict):
                 _pass = _pass.rstrip() #remove whatever separates lines
                 _resp = ssh(host=settings_dict["host"], port=int(_port),
                     username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass)
-                print(_resp)
+                output_response(_resp, settings_dict["show_failures"])
                 if _resp[0] == 1:
                     if settings_dict['stop_on_success']:
                         break
