@@ -139,8 +139,12 @@ def crack(settings_dict):
             for _pass in iterate_over_password_file(settings_dict["password_file"]):
 
                 _pass = _pass.rstrip() #remove whatever separates lines
-                print(ssh(host=settings_dict["host"], port=int(_port),
-                    username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass))
+                _resp = ssh(host=settings_dict["host"], port=int(_port),
+                    username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass)
+                print(_resp)
+                if _resp[0] == 1:
+                    if settings_dict['stop_on_success']:
+                        break
 
 
 if __name__ == "__main__":
