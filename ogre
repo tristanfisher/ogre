@@ -125,10 +125,12 @@ def crack(settings_dict):
     if settings_dict["debug"]:
         print("DEBUG >> " + str(settings_dict))
 
+    _username = settings_dict["username"]
+
     if settings_dict["password"]:
         for _port in settings_dict["ports"]:
             print(ssh(host=settings_dict["host"], port=int(_port),
-                username=settings_dict["username"], password=settings_dict["password"],
+                username=_username, password=settings_dict["password"],
                 timeout=settings_dict["timeout"]))
 
     else:
@@ -138,7 +140,7 @@ def crack(settings_dict):
 
                 _pass = _pass.rstrip() #remove whatever separates lines
                 print(ssh(host=settings_dict["host"], port=int(_port),
-                    username=settings_dict["username"], password=_pass, timeout=settings_dict["timeout"]))
+                    username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass))
 
 
 if __name__ == "__main__":
