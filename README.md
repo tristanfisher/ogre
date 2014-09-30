@@ -46,6 +46,12 @@ Or, if you know the password, specify it:
 
 	./ogre --ip 127.0.0.1 --port 22 --username 'tristan' --crack --password 'password'
 
+#####--scan --crack
+
+You can chain the options to acheive a sort of "autopilot" mode in which ogre will attempt to brute force ports that look like SSH from a scan:
+
+./ogre --host 127.0.0.1 --port 2-1024 --timeout .5 --password_file password_dictionary.txt.gz --username 'tristan' --scan --crack
+
 ####why?
 
 because i found a computer in my closet, i don't have a usb keyboard, and i forgot the password i had set.
