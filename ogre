@@ -185,14 +185,14 @@ def crack(settings_dict):
         print("DEBUG >> " + str(settings_dict))
 
     if settings_dict["password_file"]:
-        # password_file is outer loop -- multiple FH would be wasteful
-        stub_req = (0, '127.0.0.1', 2222, '[paramiko.SSHException] : Authentication failed.', 'tfisher', 'some_pass')
-        password_iterable = iterate_over_password_file(settings_dict["password_file"])
+        # password_file should be in outer loop.  reimplement as class so we can file_obj.seek(0)
 
         # for each port, try each password
         for _port in settings_dict["ports"]:
+            password_iterable = iterate_over_password_file(settings_dict["password_file"])
 
             for _pass in password_iterable:
+
                 _pass = _pass.rstrip()  # remove whatever separates lines
 
                 _req = ssh(host=settings_dict["host"], port=int(_port),
@@ -205,6 +205,8 @@ def crack(settings_dict):
                 if _req[0] == 1:
                     if settings_dict['stop_on_success']:
                         break  # break out of loop of passwords, returning to loop of ports
+
+        #file_obj.seek(0)
 
     else:  # just ssh to a bunch of ports with preset password.
         for _port in settings_dict["ports"]:
@@ -297,7 +299,6 @@ if __name__ == "__main__":
         for _p in crack(argument_dictionary):
             if _p:
                 print(_p)
-
 
     else:
         parser.error("No action specified.  Re-run with scan or crack.")
