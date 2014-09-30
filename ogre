@@ -24,11 +24,18 @@ import paramiko
 import socket
 import tempfile
 import gzip
+import signal
 import sys
 
 
 VERSION = 0.03
 TEMP_DIR = tempfile.gettempdir()
+
+
+def _sig_handler(_signal, _frame):
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, _sig_handler)
 
 
 def send_packet(host, port, timeout_seconds, recv_bytes):
