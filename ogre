@@ -35,11 +35,20 @@ TEMP_DIR = tempfile.gettempdir()
 def _sig_handler(_signal, _frame):
     sys.exit(0)
 
-signal.signal(signal.SIGINT, _sig_handler)
+signal.signal(signal.SIGINT, _sig_handler)  # ^c shouldn't spit out a stacktrace
 
 
 def send_packet(host, port, timeout_seconds, recv_bytes):
-    """
+    """send a tcp packet with a binary space as content to generate a response
+    from the listening protocol.  returns a tuple of (status, host, port, recv_bytes data)
+
+    arguments:
+    host -- target host
+    port -- target port
+    timeout_seconds -- how long to wait for a response
+    recv_bytes -- number of bytes to place in the tuple return
+
+    note:
     [Errno 61] Connection refused => probably nothing listening
 
     Listening will log something like:
@@ -73,7 +82,15 @@ def iterate_over_password_file(password_file):
 
 
 def ssh(host, port, username, password=None, timeout=5):
-    """SSH to username@ip:port -p PASSWORD (optional)"""
+    """Returns a tuple with the result of trying to SSH to an endpoint.
+
+    arguments:
+    host -- target host
+    port -- target port
+    username -- username for authentication
+    password -- password for authentication
+    timeout -- how long to wait for a response on SSH build-up and banner response
+    """
     KEYS_FILENAME = TEMP_DIR + "/ogre.keys"
     LOG_FILENAME = TEMP_DIR + "/ogre.ssh.log"
 
@@ -107,11 +124,18 @@ def ssh(host, port, username, password=None, timeout=5):
         return 0, host, port, "[exception] fatal error occurred before creating connection"
 
 
-def output_response(_resp, show_failures=False):
-        if show_failures:
-            return _resp
-        elif _resp[0] == 1:
-            return _resp
+def filter_response(_resp, show_failures=False):
+    """Return a tuple that optionally filters failure responses.
+    arguments:
+    _resp -- the response tuple to evaluate
+
+    Keyword arguments:
+    show_failures -- Boolean as to whether or not to return failure responses
+    """
+    if show_failures:
+        return _resp
+    elif _resp[0] == 1:
+        return _resp
 
 
 def scan(settings_dict):
@@ -119,11 +143,28 @@ def scan(settings_dict):
         print("DEBUG >> " + str(settings_dict))
 
     for _port in settings_dict["ports"]:
-        yield output_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
+        _f = filter_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
                                     settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
-
+        if _f: yield _f
 
 def crack(settings_dict):
+    """yield a response of trying a username/password combination against a host/port combination.
+
+    arguments:
+    settings_dict -- a dictionary containing at least:
+        - host -- target host
+        - port -- target port
+        - username -- username for authentication
+
+        and one of:
+        - password -- password for authentication
+        - password_file -- gzip or plaintext file to iterate over for authentication passwords
+
+        and optionally:
+        - timeout -- how long to wait for a response on SSH build-up and banner response
+        - show_failures -- whether or not to ask filter_response() to return failures
+
+    """
 
     # todo: ehhhh kind of breaks modular expectation. raise err and catch in argparse section?
     if not (settings_dict["password"] or settings_dict["password_file"]):
@@ -141,9 +182,10 @@ def crack(settings_dict):
 
     if settings_dict["password"]:
         for _port in settings_dict["ports"]:
-            yield output_response(ssh(host=settings_dict["host"], port=int(_port),
+            _f = filter_response(ssh(host=settings_dict["host"], port=int(_port),
                 username=_username, password=settings_dict["password"],
                 timeout=settings_dict["timeout"]), settings_dict["show_failures"])
+            if _f: yield _f
 
     else:
         for _port in settings_dict["ports"]:
@@ -155,7 +197,8 @@ def crack(settings_dict):
                 _pass = _pass.rstrip() #remove whatever separates lines
                 _resp = ssh(host=settings_dict["host"], port=int(_port),
                     username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass)
-                yield output_response(_resp, settings_dict["show_failures"])
+                _f = filter_response(_resp, settings_dict["show_failures"])
+                if _f: yield _f
                 if _resp[0] == 1:
                     if settings_dict['stop_on_success']:
                         break
