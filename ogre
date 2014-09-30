@@ -28,7 +28,7 @@ import signal
 import sys
 
 
-VERSION = 0.03
+VERSION = 0.04
 TEMP_DIR = tempfile.gettempdir()
 
 
@@ -132,6 +132,7 @@ def filter_response(_resp, show_failures=False):
     Keyword arguments:
     show_failures -- Boolean as to whether or not to return failure responses
     """
+
     if show_failures:
         return _resp
     elif _resp[0] == 1:
@@ -144,7 +145,7 @@ def scan(settings_dict):
 
     for _port in settings_dict["ports"]:
         yield filter_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
-                                    settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
+                                          settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
 
 def crack(settings_dict):
     """yield a response of trying a username/password combination against a host/port combination.
@@ -177,33 +178,35 @@ def crack(settings_dict):
     if settings_dict["debug"]:
         print("DEBUG >> " + str(settings_dict))
 
-    _username = settings_dict["username"]
 
-    if settings_dict["password"]:
-        for _port in settings_dict["ports"]:
-            yield filter_response(ssh(host=settings_dict["host"], port=int(_port),
-                username=_username, password=settings_dict["password"],
-                timeout=settings_dict["timeout"]), settings_dict["show_failures"])
+    if settings_dict["password_file"]:
+        # password_file is outer loop -- multiple FH would be wasteful
+        password_iterable = iterate_over_password_file(settings_dict["password_file"])
 
-    else:
+        # for each port, try each password
         for _port in settings_dict["ports"]:
-            # Don't store all passwords in memory, password file may be large
-            password_iterable = iterate_over_password_file(settings_dict["password_file"])
 
             for _pass in password_iterable:
 
-                _pass = _pass.rstrip() #remove whatever separates lines
-                _resp = ssh(host=settings_dict["host"], port=int(_port),
-                    username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass)
+                _pass = _pass.rstrip()  # remove whatever separates lines
 
-                yield filter_response(_resp, settings_dict["show_failures"])
+                _req = ssh(host=settings_dict["host"], port=int(_port),
+                           username=settings_dict["username"], password=_pass,
+                           timeout=settings_dict["timeout"]) + (settings_dict["username"], _pass)  # append for output
 
-                if _resp[0] == 1:
+                yield filter_response(_req, True)  # <--- addition of this llne stalls program
+
+                # need to assign req for success comparison
+                if _req[0] == 1:
                     if settings_dict['stop_on_success']:
-                        print("break")
+                        break  # break out of loop of passwords, returning to loop of ports
+            break
 
-            #Don't stop iteration here; we're in the port loop.
-        #password_iterable.send(StopIteration)
+    else:  # just ssh to a bunch of ports with preset password.
+        for _port in settings_dict["ports"]:
+            yield filter_response(ssh(host=settings_dict["host"], port=int(_port),
+                                      username=settings_dict["username"], password=settings_dict["password"],
+                                      timeout=settings_dict["timeout"]), settings_dict["show_failures"])
 
 
 if __name__ == "__main__":
@@ -277,7 +280,8 @@ if __name__ == "__main__":
                     argument_dictionary["ports"] = [_port]
                     for _conn in crack(argument_dictionary):
                         _s = _conn
-                print(_s)
+                if _s:
+                    print(_s)
 
         sys.exit(0)  # don't flow through to other actions
     elif args.scan:
