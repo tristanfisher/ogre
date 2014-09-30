@@ -26,6 +26,7 @@ import tempfile
 import gzip
 import sys
 
+
 VERSION = 0.03
 TEMP_DIR = tempfile.gettempdir()
 
@@ -163,29 +164,29 @@ if __name__ == "__main__":
     actions.add_argument("--crack", action="store_true", help="attempt to crack the SSH password on a server")
 
     parser.add_argument("--version", action="version", version="%(prog)s {0}".format(VERSION))
-    parser.add_argument("--verbose", "-v", action="store_true", default=False, help="vebose output")
+    parser.add_argument("--verbose", "--v", action="store_true", default=False, help="vebose output")
     parser.add_argument("--host", "--ip", dest="host", type=str, required=True, help="target host")
-    parser.add_argument("--port", "--ports", "-p", dest="ports", nargs="*",
+    parser.add_argument("--port", "--ports", "--p", dest="ports", nargs="*",
                         default="22", help="ports list (defaults to 22)") # don"t enforce type (22-2222)
     parser.add_argument("--scan_receive_bytes", "--scv", type=int, default="2048",
                         help="number (int) of bytes to receive when opening raw sockets to hosts (defaults to 2048)")
-    parser.add_argument("--timeout", "-t",  metavar="TIMEOUT SECONDS",
+    parser.add_argument("--timeout", "--t",  metavar="TIMEOUT SECONDS",
                         type=float, default=5.0, help="time you are willing to wait per host")
-    parser.add_argument("--log_file", "-l",  metavar="/PATH/TO/LOGFILE",
+    parser.add_argument("--log_file", "--l",  metavar="/PATH/TO/LOGFILE",
                         type=str, default=TEMP_DIR+"/ogre.txt",
                         help="path to logfile to use.  defaults to $TMPDIR/ogre.txt")
-    parser.add_argument("--debug", "-d", action="store_true", default=False, help="get debugging information")
+    parser.add_argument("--debug", "--d", action="store_true", default=False, help="get debugging information")
     parser.add_argument("--show_failures", "--failures", action="store_true", default=False,
                         help="display closed/refused connections to ports in the output")
 
     # TODO: username file? for u in username_file (fork): for p in password (fork)
     options_ssh = parser.add_argument_group("ssh", "options for trying to get a shell via ssh")
-    options_ssh.add_argument("--username", "-u", type=str, help="specify username (defaults to root)")
+    options_ssh.add_argument("--username", "--u", type=str, help="specify username (defaults to root)")
 
     #password_option = options_ssh.add_mutually_exclusive_group(required=True) -- this becomes a pain if scan only
-    options_ssh.add_argument("--password", "-pw",  metavar="PASSWORD",
+    options_ssh.add_argument("--password", "--pw",  metavar="PASSWORD",
                              type=str, help="if you know the password, specify it, else, use --password_file")
-    options_ssh.add_argument("--password_file", "-f", metavar="PASSWORD_FILE_NAME",
+    options_ssh.add_argument("--password_file", "--f", metavar="PASSWORD_FILE_NAME",
                              type=str, help="specify a password file, newline separated")
     options_ssh.add_argument("--stop_on_success", action="store_false", default=True,
                         help="stop trying to get a shell when successful (useful when trying multiple usernames")
