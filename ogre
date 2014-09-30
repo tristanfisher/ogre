@@ -203,7 +203,8 @@ def crack(settings_dict):
                     if settings_dict['stop_on_success']:
                         break
 
-            password_iterable.send(StopIteration)
+            #Don't stop iteration here; we're in the port loop.
+        #password_iterable.send(StopIteration)
 
 
 if __name__ == "__main__":
