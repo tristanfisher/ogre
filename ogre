@@ -110,18 +110,23 @@ def ssh(host, port, username, password=None, timeout=5):
                     _s = list(_s)
                     if len(_s) > 0:
                         return 1, host, port, _s
-                client.close()
             except socket.error as e:
                 return 0, host, port, "socket was closed on us"
+            finally:
+                client.close()
         except socket.error as e:
             return 0, host, port, "[socket.error] {host} : {error}".format(host=host, error=e)
         except paramiko.SSHException as pm_ssh:
             return 0, host, port, "[paramiko.SSHException] : {0}".format(pm_ssh)
         except Exception as e:
             return 0, host, port, e
+        finally:
+            client.close()
 
     except:  # don't crash out, we might be in a loop to check N hosts
+        print("except")
         return 0, host, port, "[exception] fatal error occurred before creating connection"
+
 
 
 def filter_response(_resp, show_failures=False):
@@ -146,6 +151,7 @@ def scan(settings_dict):
     for _port in settings_dict["ports"]:
         yield filter_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
                                           settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
+
 
 def crack(settings_dict):
     """yield a response of trying a username/password combination against a host/port combination.
@@ -178,29 +184,27 @@ def crack(settings_dict):
     if settings_dict["debug"]:
         print("DEBUG >> " + str(settings_dict))
 
-
     if settings_dict["password_file"]:
         # password_file is outer loop -- multiple FH would be wasteful
+        stub_req = (0, '127.0.0.1', 2222, '[paramiko.SSHException] : Authentication failed.', 'tfisher', 'some_pass')
         password_iterable = iterate_over_password_file(settings_dict["password_file"])
 
         # for each port, try each password
         for _port in settings_dict["ports"]:
 
             for _pass in password_iterable:
-
                 _pass = _pass.rstrip()  # remove whatever separates lines
 
                 _req = ssh(host=settings_dict["host"], port=int(_port),
                            username=settings_dict["username"], password=_pass,
                            timeout=settings_dict["timeout"]) + (settings_dict["username"], _pass)  # append for output
 
-                yield filter_response(_req, True)  # <--- addition of this llne stalls program
+                yield filter_response(_req, settings_dict["show_failures"])
 
                 # need to assign req for success comparison
                 if _req[0] == 1:
                     if settings_dict['stop_on_success']:
                         break  # break out of loop of passwords, returning to loop of ports
-            break
 
     else:  # just ssh to a bunch of ports with preset password.
         for _port in settings_dict["ports"]:
