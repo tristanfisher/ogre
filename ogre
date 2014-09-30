@@ -135,7 +135,7 @@ def filter_response(_resp, show_failures=False):
     if show_failures:
         return _resp
     elif _resp[0] == 1:
-        return _resp
+        return _resp  # returns None because generator
 
 
 def scan(settings_dict):
@@ -143,9 +143,8 @@ def scan(settings_dict):
         print("DEBUG >> " + str(settings_dict))
 
     for _port in settings_dict["ports"]:
-        _f = filter_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
+        yield filter_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
                                     settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
-        if _f: yield _f
 
 def crack(settings_dict):
     """yield a response of trying a username/password combination against a host/port combination.
@@ -182,10 +181,9 @@ def crack(settings_dict):
 
     if settings_dict["password"]:
         for _port in settings_dict["ports"]:
-            _f = filter_response(ssh(host=settings_dict["host"], port=int(_port),
+            yield filter_response(ssh(host=settings_dict["host"], port=int(_port),
                 username=_username, password=settings_dict["password"],
                 timeout=settings_dict["timeout"]), settings_dict["show_failures"])
-            if _f: yield _f
 
     else:
         for _port in settings_dict["ports"]:
@@ -197,11 +195,12 @@ def crack(settings_dict):
                 _pass = _pass.rstrip() #remove whatever separates lines
                 _resp = ssh(host=settings_dict["host"], port=int(_port),
                     username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass)
-                _f = filter_response(_resp, settings_dict["show_failures"])
-                if _f: yield _f
+
+                yield filter_response(_resp, settings_dict["show_failures"])
+
                 if _resp[0] == 1:
                     if settings_dict['stop_on_success']:
-                        break
+                        print("break")
 
             #Don't stop iteration here; we're in the port loop.
         #password_iterable.send(StopIteration)
@@ -269,24 +268,28 @@ if __name__ == "__main__":
 
     if args.scan and args.crack:
         for _s in scan(argument_dictionary):
-            _port = (_s[2])
-            _resp_text = (_s[3])
-            # shameful, but works for now. should get more raw data from socket for fingerprint
-            _proto = 'ssh' if 'ssh' in str(_resp_text).lower() else None
-            if _proto == 'ssh':
-                argument_dictionary["ports"] = [_port]
-                for _conn in crack(argument_dictionary):
-                    print(_conn)
-            else:
+            if _s:
+                _port = (_s[2])
+                _resp_text = (_s[3])
+                # shameful, but works for now. should get more raw data from socket for fingerprint
+                _proto = 'ssh' if 'ssh' in str(_resp_text).lower() else None
+                if _proto == 'ssh':
+                    argument_dictionary["ports"] = [_port]
+                    for _conn in crack(argument_dictionary):
+                        _s = _conn
                 print(_s)
 
         sys.exit(0)  # don't flow through to other actions
     elif args.scan:
         for _s in scan(argument_dictionary):
-            print(_s)
+            if _s:
+                print(_s)
+
     elif args.crack:
         for _p in crack(argument_dictionary):
-            print(_p)
+            if _p:
+                print(_p)
+
 
     else:
         parser.error("No action specified.  Re-run with scan or crack.")
