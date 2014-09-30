@@ -109,24 +109,27 @@ def ssh(host, port, username, password=None, timeout=5):
 
 def output_response(_resp, show_failures=False):
         if show_failures:
-            print(_resp)
+            return _resp
         elif _resp[0] == 1:
-            print(_resp)
+            return _resp
 
 
 def scan(settings_dict):
     if settings_dict["debug"]:
         print("DEBUG >> " + str(settings_dict))
 
-    # TODO: profile moving `settings_dict['open_only'] == False` before loop so we don't have to do O(n)
-    #       comparisons.  it's cleaner/DRY-er to do an inline check, so see if check gets optimized already
-
     for _port in settings_dict["ports"]:
-        output_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
+        yield output_response(send_packet(settings_dict["host"], int(_port), settings_dict["timeout"],
                                     settings_dict["scan_receive_bytes"]), settings_dict["show_failures"])
 
 
 def crack(settings_dict):
+
+    # todo: ehhhh kind of breaks modular expectation. raise err and catch in argparse section?
+    if not (settings_dict["password"] or settings_dict["password_file"]):
+        parser.error("--crack specified, but neither --password or --password_file was set.")
+    if (settings_dict["password"] and settings_dict["password_file"]):
+        parser.error("please specify --password OR --password_file (not both).")
 
     # TODO: DRY up -- potentially iterate on _password
     # TODO: add iterator over username dict
@@ -138,22 +141,26 @@ def crack(settings_dict):
 
     if settings_dict["password"]:
         for _port in settings_dict["ports"]:
-            output_response(ssh(host=settings_dict["host"], port=int(_port),
+            yield output_response(ssh(host=settings_dict["host"], port=int(_port),
                 username=_username, password=settings_dict["password"],
                 timeout=settings_dict["timeout"]), settings_dict["show_failures"])
 
     else:
         for _port in settings_dict["ports"]:
             # Don't store all passwords in memory, password file may be large
-            for _pass in iterate_over_password_file(settings_dict["password_file"]):
+            password_iterable = iterate_over_password_file(settings_dict["password_file"])
+
+            for _pass in password_iterable:
 
                 _pass = _pass.rstrip() #remove whatever separates lines
                 _resp = ssh(host=settings_dict["host"], port=int(_port),
                     username=_username, password=_pass, timeout=settings_dict["timeout"]) + (_username, _pass)
-                output_response(_resp, settings_dict["show_failures"])
+                yield output_response(_resp, settings_dict["show_failures"])
                 if _resp[0] == 1:
                     if settings_dict['stop_on_success']:
                         break
+
+            password_iterable.send(StopIteration)
 
 
 if __name__ == "__main__":
@@ -188,7 +195,7 @@ if __name__ == "__main__":
 
     # TODO: username file? for u in username_file (fork): for p in password (fork)
     options_ssh = parser.add_argument_group("ssh", "options for trying to get a shell via ssh")
-    options_ssh.add_argument("--username", "--u", type=str, help="specify username (defaults to root)")
+    options_ssh.add_argument("--username", "--u", type=str, default="root", help="specify username (defaults to root)")
 
     #password_option = options_ssh.add_mutually_exclusive_group(required=True) -- this becomes a pain if scan only
     options_ssh.add_argument("--password", "--pw",  metavar="PASSWORD",
@@ -217,18 +224,25 @@ if __name__ == "__main__":
     argument_dictionary = vars(args)
 
     if args.scan and args.crack:
-        #return scan() success to crack()
-        raise NotImplementedError
+        for _s in scan(argument_dictionary):
+            _port = (_s[2])
+            _resp_text = (_s[3])
+            # shameful, but works for now. should get more raw data from socket for fingerprint
+            _proto = 'ssh' if 'ssh' in str(_resp_text).lower() else None
+            if _proto == 'ssh':
+                argument_dictionary["ports"] = [_port]
+                for _conn in crack(argument_dictionary):
+                    print(_conn)
+            else:
+                print(_s)
 
+        sys.exit(0)  # don't flow through to other actions
     elif args.scan:
-        scan(argument_dictionary)
-
+        for _s in scan(argument_dictionary):
+            print(_s)
     elif args.crack:
-        if not (args.password or args.password_file):
-            parser.error("--crack specified, but neither --password or --password_file was set.")
-        if (args.password and args.password_file):
-            parser.error("please specify --password OR --password_file (not both).")
-        crack(argument_dictionary)
+        for _p in crack(argument_dictionary):
+            print(_p)
 
     else:
         parser.error("No action specified.  Re-run with scan or crack.")
