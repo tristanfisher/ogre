@@ -16,6 +16,8 @@ Type `./ogre --help` to get usage information:
 	            [--debug] [--show_failures] [--username USERNAME]
 	            [--password PASSWORD] [--password_file PASSWORD_FILE_NAME]
 	            [--stop_on_success]
+	            
+	            
 
 Or if you prefer, check out the following:
 
@@ -23,15 +25,15 @@ Or if you prefer, check out the following:
 
 Specify a `--host` and a comma separated set of ports:
 
-	./ogre --host tristanfisher.com --scan -p 22,80,443
+	./ogre --host tristanfisher.com --scan --port 22,80,443
 
 Or a range of ports:
 
-	./ogre --host tristanfisher.com --scan -p 22-1024
+	./ogre --host tristanfisher.com --scan --port 22-1024
 	
 Or just one port:
 
-	./ogre --host tristanfisher.com --scan -p 22
+	./ogre --host tristanfisher.com --scan --port 22
 
 #####--crack
 
