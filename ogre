@@ -18,17 +18,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-
-import mimetypes
-import paramiko
-import socket
-import tempfile
 import gzip
+import mimetypes
+import os
+import paramiko
 import signal
+import socket
 import sys
+import tempfile
 
 
-VERSION = 0.04
+VERSION = 0.05
 TEMP_DIR = tempfile.gettempdir()
 
 
@@ -36,6 +36,24 @@ def _sig_handler(_signal, _frame):
     sys.exit(0)
 
 signal.signal(signal.SIGINT, _sig_handler)  # ^c shouldn't spit out a stacktrace
+
+
+def _mkdir(_dir):
+    if os.path.isdir(_dir): pass
+    elif os.path.isfile(_dir):
+        raise OSError("%s exists as a regular file." % _dir)
+    else:
+        parent, directory = os.path.split(_dir)
+        if parent and not os.path.isdir(parent): _mkdir(parent)
+        if directory: os.mkdir(_dir)
+
+
+def _touch(_dir = None, _file = None, times=None, ns=None, dir_fd=None):
+    _f = os.path.join(_dir, _file)
+
+    #race conditon, but acceptable risk
+    if not os.path.exists(_f):
+        open(_f, 'x').close()
 
 
 def send_packet(host, port, timeout_seconds, recv_bytes):
@@ -81,7 +99,7 @@ def iterate_over_password_file(password_file):
             yield line
 
 
-def ssh(host, port, username, password=None, timeout=5):
+def ssh(host, port, username, password=None, timeout=5, key_file=None, log_file=None):
     """Returns a tuple with the result of trying to SSH to an endpoint.
 
     arguments:
@@ -91,18 +109,16 @@ def ssh(host, port, username, password=None, timeout=5):
     password -- password for authentication
     timeout -- how long to wait for a response on SSH build-up and banner response
     """
-    KEYS_FILENAME = TEMP_DIR + "/ogre.keys"
-    LOG_FILENAME = TEMP_DIR + "/ogre.ssh.log"
 
     try:
         client = paramiko.SSHClient()
-        paramiko.util.log_to_file(LOG_FILENAME)
+        paramiko.util.log_to_file(log_file)
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
             client.connect(hostname=host, port=port, username=username, password=password,
                        timeout=timeout, banner_timeout=timeout, look_for_keys=False,
-                       key_filename=KEYS_FILENAME)
+                       key_filename=key_file)
             try:
                 stdin, stdout, stderr = client.exec_command("id")
                 for _s in [stdout, stderr]:
@@ -161,6 +177,8 @@ def crack(settings_dict):
         - host -- target host
         - port -- target port
         - username -- username for authentication
+        - key_filename -- keyfile for ssh (defaults to tmpdir + ogre.keys)
+        - log_filename -- logfile for ssh connections (defaults to tmpdir + ogre.ssh.log)
 
         and one of:
         - password -- password for authentication
@@ -171,6 +189,14 @@ def crack(settings_dict):
         - show_failures -- whether or not to ask filter_response() to return failures
 
     """
+
+    #key_filename = TEMP_DIR + "/ogre.keys"
+    #log_filename = TEMP_DIR + "/ogre.ssh.log"
+
+    for _f in settings_dict["key_file"], settings_dict["log_file"]:
+        _f = os.path.split(_f)
+        _mkdir(_f[0])
+        _touch(_f[0], _f[1])
 
     # todo: ehhhh kind of breaks modular expectation. raise err and catch in argparse section?
     if not (settings_dict["password"] or settings_dict["password_file"]):
@@ -197,7 +223,9 @@ def crack(settings_dict):
 
                 _req = ssh(host=settings_dict["host"], port=int(_port),
                            username=settings_dict["username"], password=_pass,
-                           timeout=settings_dict["timeout"]) + (settings_dict["username"], _pass)  # append for output
+                           timeout=settings_dict["timeout"],
+                           key_file=settings_dict["key_file"], log_file=settings_dict["log_file"]) + \
+                       (settings_dict["username"], _pass)  # append for output
 
                 yield filter_response(_req, settings_dict["show_failures"])
 
@@ -212,7 +240,9 @@ def crack(settings_dict):
         for _port in settings_dict["ports"]:
             yield filter_response(ssh(host=settings_dict["host"], port=int(_port),
                                       username=settings_dict["username"], password=settings_dict["password"],
-                                      timeout=settings_dict["timeout"]), settings_dict["show_failures"])
+                                      timeout=settings_dict["timeout"],
+                                      key_file=settings_dict["key_file"], log_file=settings_dict["log_file"]),
+                                  settings_dict["show_failures"])
 
 
 if __name__ == "__main__":
@@ -240,6 +270,9 @@ if __name__ == "__main__":
                         type=float, default=5.0, help="time you are willing to wait per host")
     parser.add_argument("--log_file", "--l",  metavar="/PATH/TO/LOGFILE",
                         type=str, default=TEMP_DIR+"/ogre.txt",
+                        help="path to logfile to use.  defaults to $TMPDIR/ogre.txt")
+    parser.add_argument("--key_file", "--k",  metavar="/PATH/TO/SSH_KEY_FILE",
+                        type=str, default=TEMP_DIR+"/ogre.keys",
                         help="path to logfile to use.  defaults to $TMPDIR/ogre.txt")
     parser.add_argument("--debug", "--d", action="store_true", default=False, help="get debugging information")
     parser.add_argument("--show_failures", "--failures", action="store_true", default=False,
