@@ -5,7 +5,7 @@ throw connections at a host to try to figure out if services are listening.
 
 optionally brute force your way in.
 
-####how to use
+#### how to use
 
 Type `./ogre --help` to get usage information:
 
@@ -21,7 +21,7 @@ Type `./ogre --help` to get usage information:
 
 Or if you prefer, check out the following:
 
-#####--scan
+##### --scan
 
 Specify a `--host` and a comma separated set of ports:
 
@@ -35,7 +35,7 @@ Or just one port:
 
 	./ogre --host tristanfisher.com --scan --port 22
 
-#####--crack
+##### --crack
 
 Specify a password dictionary (*ogre* can read gzip or plaintext files, no need to decompress first):
 
@@ -46,20 +46,20 @@ Or, if you know the password, specify it:
 
 	./ogre --ip 127.0.0.1 --port 22 --username 'tristan' --crack --password 'password'
 
-#####--scan --crack
+##### --scan --crack
 
 You can chain the options to acheive a sort of "autopilot" mode in which ogre will attempt to brute force ports that look like SSH from a scan:
 
 	./ogre --host 127.0.0.1 --port 2-1024 --timeout .5 --password_file password_dictionary.txt.gz --username 'tristan' --scan --crack
 
-####why?
+#### why?
 
 because i found a computer in my closet, i don't have a usb keyboard, and i forgot the password i had set.
 
 to complicate the matter, i think i set up iptables well enough that it's filtering connections from nmap.  hooray.
 
 
-####other notes
+#### other notes
 
 ###### malicious use
 
